@@ -1,0 +1,23 @@
+{
+  "name": "xenocrm",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "test": "pnpm --filter @xeno/crm-api test",
+    "db:migrate": "pnpm --filter @xeno/crm-api db:migrate",
+    "db:migrate:deploy": "pnpm --filter @xeno/crm-api db:migrate:deploy",
+    "db:seed": "pnpm --filter @xeno/crm-api db:seed",
+    "db:generate": "pnpm --filter @xeno/crm-api db:generate",
+    "db:up": "docker compose up -d"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  }
+}

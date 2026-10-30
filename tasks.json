@@ -1,0 +1,1024 @@
+{
+  "project": {
+    "name": "XenoCRM",
+    "description": "AI-native mini CRM for consumer brands",
+    "brand": {
+      "name": "Thread & Co.",
+      "tagline": "Indian fashion brand — casual but premium",
+      "locale": "en-IN",
+      "currency": "INR",
+      "currencySymbol": "₹"
+    },
+    "version": "1.0.0",
+    "prdFile": "XenoCRM_PRD.md"
+  },
+  "decisions": {
+    "ai": {
+      "provider": "Google Gemini 2.5 Flash",
+      "model": "gemini-2.5-flash",
+      "sdk": "Vercel AI SDK",
+      "envVar": "GEMINI_API_KEY",
+      "streaming": true,
+      "proactiveInsights": "rules-based SQL + optional LLM polish on one primary insight"
+    },
+    "architecture": {
+      "monorepo": "pnpm workspaces + Turborepo",
+      "services": ["apps/web", "apps/crm-api", "apps/channel-stub"],
+      "sharedPackage": "packages/shared",
+      "twoServiceRequired": true,
+      "stubSecretHeader": "STUB_SECRET"
+    },
+    "stack": {
+      "frontend": "Next.js 14 App Router + Tailwind + shadcn/ui + TanStack Query",
+      "crmBackend": "Node.js + Fastify + TypeScript",
+      "channelStub": "Node.js + Fastify + TypeScript",
+      "database": "PostgreSQL (Neon)",
+      "orm": "Prisma",
+      "validation": "Zod",
+      "realtime": "Socket.io",
+      "charts": "Recharts",
+      "hosting": {
+        "web": "Vercel",
+        "crmApi": "Railway",
+        "channelStub": "Railway"
+      }
+    },
+    "tagThresholds": {
+      "NEW": "first purchase < 30 days OR only 1 order",
+      "VIP": "top 10% by total spend",
+      "LAPSED": "no purchase in 60+ days",
+      "AT_RISK": "30-60 days since last purchase AND spend declining",
+      "REGULAR": "everything else"
+    },
+    "campaignRules": {
+      "simultaneousCampaigns": true,
+      "confirmationGate": "intent classification + server-side confirmation flag before fireCampaign",
+      "personalization": "template + rules only ({name} + VIP tone variant, no per-recipient LLM)",
+      "rerunCampaign": "new conversation thread with segment + message injected as system context"
+    },
+    "enhancements": [
+      "Campaign draft object persisted before confirmation",
+      "Rules-based insights + LLM polish",
+      "Recipient status state machine",
+      "SEED_ONLY env flag for reproducible demo data"
+    ]
+  },
+  "phases": [
+    {
+      "id": "foundation",
+      "name": "Foundation",
+      "order": 1
+    },
+    {
+      "id": "backend-crm",
+      "name": "Backend (CRM API)",
+      "order": 2
+    },
+    {
+      "id": "backend-stub",
+      "name": "Backend (Channel Stub)",
+      "order": 3
+    },
+    {
+      "id": "frontend",
+      "name": "Frontend",
+      "order": 4
+    },
+    {
+      "id": "ai-layer",
+      "name": "AI Layer",
+      "order": 5
+    },
+    {
+      "id": "polish",
+      "name": "Polish",
+      "order": 6
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-01",
+      "number": 1,
+      "title": "Monorepo scaffold",
+      "phase": "foundation",
+      "status": "completed",
+      "dependencies": [],
+      "description": "Bootstrap pnpm/Turbo monorepo with three apps and shared package.",
+      "files": [
+        "pnpm-workspace.yaml",
+        "turbo.json",
+        "package.json",
+        "tsconfig.base.json",
+        ".gitignore",
+        ".env.example",
+        "apps/web/package.json",
+        "apps/web/tsconfig.json",
+        "apps/web/next.config.js",
+        "apps/web/src/app/layout.tsx",
+        "apps/web/src/app/page.tsx",
+        "apps/crm-api/package.json",
+        "apps/crm-api/tsconfig.json",
+        "apps/crm-api/src/index.ts",
+        "apps/channel-stub/package.json",
+        "apps/channel-stub/tsconfig.json",
+        "apps/channel-stub/src/index.ts",
+        "packages/shared/package.json",
+        "packages/shared/tsconfig.json",
+        "packages/shared/src/index.ts",
+        "packages/shared/src/brand.ts",
+        "packages/shared/src/constants.ts"
+      ],
+      "acceptanceCriteria": [
+        "pnpm install succeeds",
+        "pnpm dev starts all three apps via Turbo",
+        "pnpm build compiles all packages",
+        "Shared package importable from apps"
+      ],
+      "subtasks": [
+        "Create workspace config and Turbo pipeline",
+        "Scaffold apps/web (Next.js 14 placeholder)",
+        "Scaffold apps/crm-api (Fastify placeholder on port 3001)",
+        "Scaffold apps/channel-stub (Fastify placeholder on port 3002)",
+        "Scaffold packages/shared with brand constants",
+        "Add root scripts: dev, build, db:migrate, db:seed",
+        "Add .gitignore and .env.example skeleton"
+      ]
+    },
+    {
+      "id": "task-02",
+      "number": 2,
+      "title": "Database schema (Prisma)",
+      "phase": "foundation",
+      "status": "completed",
+      "dependencies": ["task-01"],
+      "description": "Define all 5 Prisma entities with enums, indexes, and migrations.",
+      "files": [
+        "apps/crm-api/prisma/schema.prisma",
+        "apps/crm-api/prisma/migrations/20250615000000_init/migration.sql",
+        "apps/crm-api/prisma/migrations/migration_lock.toml",
+        "apps/crm-api/prisma/seed.ts",
+        "apps/crm-api/src/lib/prisma.ts",
+        "docker-compose.yml"
+      ],
+      "acceptanceCriteria": [
+        "All PRD entities: Customer, Order, Campaign, CampaignRecipient, AIConversation",
+        "All required enums defined",
+        "Indexes on email, tag, customerId, campaignId, status",
+        "prisma migrate dev succeeds"
+      ],
+      "subtasks": [
+        "Define Customer model with CustomerTag enum",
+        "Define Order model with channel/status enums",
+        "Define Campaign model with channel/status enums",
+        "Define CampaignRecipient with status enum and timestamps",
+        "Define AIConversation with messages JSON",
+        "Add indexes and run initial migration"
+      ]
+    },
+    {
+      "id": "task-03",
+      "number": 3,
+      "title": "Tag computation & segment query engine",
+      "phase": "foundation",
+      "status": "completed",
+      "dependencies": ["task-02"],
+      "description": "Deterministic tag rules and structured filter DSL executed via Prisma.",
+      "files": [
+        "apps/crm-api/src/services/tag.service.ts",
+        "apps/crm-api/src/services/segment.service.ts",
+        "apps/crm-api/src/services/tag-refresh.service.ts",
+        "packages/shared/src/segment/schema.ts",
+        "packages/shared/src/segment/index.ts"
+      ],
+      "acceptanceCriteria": [
+        "Tag rules match approved thresholds",
+        "Segment DSL accepts structured JSON filters",
+        "Returns customers + totalCount",
+        "No raw SQL from AI — DSL only"
+      ],
+      "subtasks": [
+        "Implement tag computation from order history",
+        "Define SegmentFilter Zod schema in shared package",
+        "Build Prisma query builder from filters",
+        "Add unit-testable pure filter validation"
+      ]
+    },
+    {
+      "id": "task-04",
+      "number": 4,
+      "title": "Seed data script",
+      "phase": "foundation",
+      "status": "completed",
+      "dependencies": ["task-02", "task-03"],
+      "description": "Seed 200 customers, 500-700 orders, 5 historical campaigns with recipients.",
+      "files": [
+        "apps/crm-api/prisma/seed.ts",
+        "apps/crm-api/src/seed/generators.ts",
+        "apps/crm-api/src/seed/rng.ts",
+        "apps/crm-api/src/seed/run-seed.ts"
+      ],
+      "acceptanceCriteria": [
+        "200 Indian customers with realistic tag distribution",
+        "500-700 orders linked correctly",
+        "5 campaigns with varied recipient statuses",
+        "One campaign from ~7 days ago",
+        "SEED_ONLY=true produces reproducible data"
+      ],
+      "subtasks": [
+        "Create customer generator (Indian names, cities, spend ranges)",
+        "Create order generator (fashion items, channels, 18-month range)",
+        "Create 5 historical campaigns with recipients",
+        "Run tag computation post-seed",
+        "Support SEED_ONLY env for fixed random seed"
+      ]
+    },
+    {
+      "id": "task-05",
+      "number": 5,
+      "title": "Docker Compose for local Postgres",
+      "phase": "foundation",
+      "status": "completed",
+      "dependencies": ["task-01"],
+      "description": "Local Postgres 16 via Docker Compose for development.",
+      "files": ["docker-compose.yml"],
+      "acceptanceCriteria": [
+        "docker compose up starts Postgres on 5432",
+        "DATABASE_URL documented in .env.example"
+      ],
+      "subtasks": [
+        "Add docker-compose.yml with Postgres 16",
+        "Document connection string in .env.example"
+      ]
+    },
+    {
+      "id": "task-06",
+      "number": 6,
+      "title": "CRM API foundation",
+      "phase": "backend-crm",
+      "status": "completed",
+      "dependencies": ["task-02", "task-05"],
+      "description": "Fastify bootstrap with CORS, Prisma plugin, error handling, health check.",
+      "files": [
+        "apps/crm-api/src/app.ts",
+        "apps/crm-api/src/index.ts",
+        "apps/crm-api/src/plugins/prisma.ts",
+        "apps/crm-api/src/plugins/cors.ts",
+        "apps/crm-api/src/middleware/error-handler.ts",
+        "apps/crm-api/src/routes/health.ts"
+      ],
+      "acceptanceCriteria": [
+        "GET /health returns 200",
+        "Prisma connected on startup",
+        "CORS configured for frontend origin",
+        "Structured error responses"
+      ],
+      "subtasks": [
+        "Fastify app factory with plugins",
+        "Prisma client plugin (singleton)",
+        "CORS plugin with env-based origins",
+        "Global error handler",
+        "Health check route"
+      ]
+    },
+    {
+      "id": "task-07",
+      "number": 7,
+      "title": "Customer & Order REST endpoints",
+      "phase": "backend-crm",
+      "status": "completed",
+      "dependencies": ["task-06", "task-03"],
+      "description": "CRUD-adjacent read endpoints, CSV import, dashboard stats.",
+      "files": [
+        "apps/crm-api/src/routes/customers.ts",
+        "apps/crm-api/src/routes/orders.ts",
+        "apps/crm-api/src/routes/dashboard.ts",
+        "apps/crm-api/src/routes/index.ts",
+        "apps/crm-api/src/services/customer.service.ts",
+        "apps/crm-api/src/services/order.service.ts",
+        "apps/crm-api/src/services/csv-import.service.ts",
+        "apps/crm-api/src/services/dashboard.service.ts",
+        "packages/shared/src/api/schemas.ts"
+      ],
+      "acceptanceCriteria": [
+        "GET /api/customers with search, tag filter, sort, pagination",
+        "GET /api/customers/:id with orders",
+        "POST /api/customers/import with preview and upsert on email",
+        "GET /api/orders with filters",
+        "GET /api/dashboard/stats"
+      ],
+      "subtasks": [
+        "Customer list route with query params",
+        "Customer detail route",
+        "CSV import: parse, validate, preview 5 rows, upsert",
+        "Order list route",
+        "Dashboard stats aggregation"
+      ]
+    },
+    {
+      "id": "task-08",
+      "number": 8,
+      "title": "Campaign CRUD endpoints",
+      "phase": "backend-crm",
+      "status": "completed",
+      "dependencies": ["task-06", "task-03"],
+      "description": "Campaign list, detail, draft creation, launch trigger.",
+      "files": [
+        "apps/crm-api/src/routes/campaigns.ts",
+        "apps/crm-api/src/services/campaign.service.ts",
+        "apps/crm-api/src/utils/campaign-metrics.ts",
+        "packages/shared/src/api/schemas.ts"
+      ],
+      "acceptanceCriteria": [
+        "GET /api/campaigns with aggregate metrics",
+        "GET /api/campaigns/:id with recipients",
+        "POST /api/campaigns creates DRAFT",
+        "POST /api/campaigns/:id/launch triggers send pipeline"
+      ],
+      "subtasks": [
+        "Campaign list with computed metrics",
+        "Campaign detail with recipients",
+        "Draft campaign creation",
+        "Launch endpoint (delegates to campaign service)"
+      ]
+    },
+    {
+      "id": "task-09",
+      "number": 9,
+      "title": "Campaign launch & personalization pipeline",
+      "phase": "backend-crm",
+      "status": "completed",
+      "dependencies": ["task-08"],
+      "description": "Create recipients, personalize messages, call channel stub /send.",
+      "files": [
+        "apps/crm-api/src/services/campaign.service.ts",
+        "apps/crm-api/src/services/campaign-dispatch.service.ts",
+        "apps/crm-api/src/services/personalization.service.ts",
+        "apps/crm-api/src/clients/channel-stub.client.ts",
+        "apps/channel-stub/src/routes/send.ts",
+        "apps/channel-stub/src/services/simulator.service.ts",
+        "packages/shared/src/channel/types.ts"
+      ],
+      "acceptanceCriteria": [
+        "{name} substitution per recipient",
+        "VIP tone variant applied",
+        "Batch POST to stub /send",
+        "Graceful error if stub unreachable",
+        "Campaign draft persisted before confirmation"
+      ],
+      "subtasks": [
+        "Personalization service ({name} + VIP variant)",
+        "Create CampaignRecipient records as QUEUED",
+        "Build stub payload and POST /send",
+        "Handle stub failure with retry message",
+        "Update campaign status to SENDING"
+      ]
+    },
+    {
+      "id": "task-10",
+      "number": 10,
+      "title": "Receipt ingestion (idempotent)",
+      "phase": "backend-crm",
+      "status": "completed",
+      "dependencies": ["task-06"],
+      "description": "POST /api/receipt with state machine, idempotency, STUB_SECRET auth.",
+      "files": [
+        "apps/crm-api/src/routes/receipts.ts",
+        "apps/crm-api/src/services/receipt.service.ts",
+        "apps/crm-api/src/services/recipient-state-machine.ts",
+        "packages/shared/src/channel/receipt.ts"
+      ],
+      "acceptanceCriteria": [
+        "STUB_SECRET header validated",
+        "Idempotent on duplicate recipientId+event",
+        "State machine rejects invalid transitions",
+        "Campaign COMPLETED when all recipients terminal",
+        "Triggers post-campaign summary job on complete"
+      ],
+      "subtasks": [
+        "Receipt route with STUB_SECRET middleware",
+        "Recipient status state machine",
+        "Idempotent update logic",
+        "Campaign completion detection",
+        "Timestamp fields updated per event"
+      ]
+    },
+    {
+      "id": "task-11",
+      "number": 11,
+      "title": "WebSocket real-time push",
+      "phase": "backend-crm",
+      "status": "completed",
+      "dependencies": ["task-06", "task-10"],
+      "description": "Socket.io rooms per campaignId, push recipient updates.",
+      "files": [
+        "apps/crm-api/src/plugins/socket.ts",
+        "apps/crm-api/src/services/realtime.service.ts"
+      ],
+      "acceptanceCriteria": [
+        "Client joins campaign room",
+        "Events: recipient:update, campaign:progress, campaign:completed",
+        "Updates emitted within 500ms of receipt"
+      ],
+      "subtasks": [
+        "Socket.io plugin on Fastify",
+        "Room join/leave handlers",
+        "Emit on receipt ingestion",
+        "Progress calculation helper"
+      ]
+    },
+    {
+      "id": "task-12",
+      "number": 12,
+      "title": "Dashboard insights endpoint",
+      "phase": "backend-crm",
+      "status": "completed",
+      "dependencies": ["task-07"],
+      "description": "Rules-based proactive suggestions with optional Gemini polish.",
+      "files": [
+        "apps/crm-api/src/routes/insights.ts",
+        "apps/crm-api/src/services/insights.service.ts",
+        "apps/crm-api/src/ai/insight-polish.ts"
+      ],
+      "acceptanceCriteria": [
+        "GET /api/insights returns primary insight + CTA context",
+        "Rules: lapsed>50, VIP untouched 30d, open rate>40%, new>20",
+        "Optional LLM polish on primary insight only"
+      ],
+      "subtasks": [
+        "SQL rules engine for all 4 insight types",
+        "Pick highest-priority insight",
+        "Optional Gemini polish call",
+        "Return structured response for dashboard banner"
+      ]
+    },
+    {
+      "id": "task-13",
+      "number": 13,
+      "title": "Channel stub service scaffold",
+      "phase": "backend-stub",
+      "status": "completed",
+      "dependencies": ["task-01"],
+      "description": "Separate Fastify app for channel simulation.",
+      "files": [
+        "apps/channel-stub/src/index.ts",
+        "apps/channel-stub/src/app.ts"
+      ],
+      "acceptanceCriteria": [
+        "Runs on separate port (3002)",
+        "Health check endpoint",
+        "Separate deployable package"
+      ],
+      "subtasks": [
+        "Fastify bootstrap",
+        "Health route",
+        "Env config for CRM callback URL and STUB_SECRET"
+      ]
+    },
+    {
+      "id": "task-14",
+      "number": 14,
+      "title": "POST /send with async callback simulation",
+      "phase": "backend-stub",
+      "status": "completed",
+      "dependencies": ["task-13"],
+      "description": "Accept batch, simulate delivery with probabilistic outcomes.",
+      "files": [
+        "apps/channel-stub/src/routes/send.ts",
+        "apps/channel-stub/src/services/simulator.service.ts",
+        "apps/channel-stub/src/services/outcome-rates.ts"
+      ],
+      "acceptanceCriteria": [
+        "Returns {accepted: true, jobId} immediately",
+        "Per-recipient delays 2-25s",
+        "Sequential events: delivered→opened→clicked→converted",
+        "Probabilities per PRD (WhatsApp 60% open)",
+        "Failure reasons and network_timeout retry"
+      ],
+      "subtasks": [
+        "POST /send route",
+        "Random delay scheduler",
+        "Outcome probability engine",
+        "Sequential event firing per recipient",
+        "network_timeout retry once at 5s, 50% success"
+      ]
+    },
+    {
+      "id": "task-15",
+      "number": 15,
+      "title": "Stub → CRM callback client",
+      "phase": "backend-stub",
+      "status": "completed",
+      "dependencies": ["task-14"],
+      "description": "POST callbacks to CRM /api/receipt with STUB_SECRET header.",
+      "files": [
+        "apps/channel-stub/src/clients/crm.client.ts"
+      ],
+      "acceptanceCriteria": [
+        "POST to CRM_CALLBACK_URL/api/receipt",
+        "STUB_SECRET header included",
+        "Retry on 5xx",
+        "Logging for demo visibility"
+      ],
+      "subtasks": [
+        "CRM callback HTTP client",
+        "STUB_SECRET header injection",
+        "Retry logic",
+        "Structured logging"
+      ]
+    },
+    {
+      "id": "task-16",
+      "number": 16,
+      "title": "Next.js app scaffold",
+      "phase": "frontend",
+      "status": "completed",
+      "dependencies": ["task-01"],
+      "description": "App Router layout, nav, API client, Socket.io hook.",
+      "files": [
+        "apps/web/src/app/layout.tsx",
+        "apps/web/src/components/layout/sidebar.tsx",
+        "apps/web/src/lib/api-client.ts",
+        "apps/web/src/hooks/use-campaign-socket.ts",
+        "apps/web/src/providers/query-provider.tsx"
+      ],
+      "acceptanceCriteria": [
+        "Sidebar nav: Dashboard, Data Hub, Campaigns, AI Console",
+        "All PRD routes exist as placeholders",
+        "TanStack Query provider",
+        "Socket.io client hook"
+      ],
+      "subtasks": [
+        "Tailwind + shadcn/ui init",
+        "Root layout with sidebar",
+        "Route placeholders per PRD §10",
+        "API client wrapper",
+        "Query provider + socket hook"
+      ]
+    },
+    {
+      "id": "task-17",
+      "number": 17,
+      "title": "Data Hub — Customers tab",
+      "phase": "frontend",
+      "status": "completed",
+      "dependencies": ["task-16", "task-07"],
+      "description": "Customer table with search, filter, sort, detail panel.",
+      "files": [
+        "apps/web/src/app/data/customers/page.tsx",
+        "apps/web/src/app/data/customers/[id]/page.tsx",
+        "apps/web/src/components/data/customer-table.tsx",
+        "apps/web/src/components/data/customer-detail.tsx"
+      ],
+      "acceptanceCriteria": [
+        "Table with all PRD columns",
+        "Search, tag filter, sort",
+        "Coloured tag badges",
+        "Detail panel with orders + Create Campaign shortcut"
+      ],
+      "subtasks": [
+        "Customer table component",
+        "Search/filter/sort controls",
+        "Tag badge component",
+        "Customer detail page/slide-over",
+        "Create Campaign navigation with context"
+      ]
+    },
+    {
+      "id": "task-18",
+      "number": 18,
+      "title": "Data Hub — CSV import flow",
+      "phase": "frontend",
+      "status": "completed",
+      "dependencies": ["task-17"],
+      "description": "Import modal with preview, validation, confirm.",
+      "files": [
+        "apps/web/src/components/data/csv-import-modal.tsx"
+      ],
+      "acceptanceCriteria": [
+        "File upload → preview 5 rows",
+        "Per-row validation errors",
+        "Confirm import with success toast"
+      ],
+      "subtasks": [
+        "Import modal UI",
+        "Preview table",
+        "Error display per row",
+        "Confirm and refresh list"
+      ]
+    },
+    {
+      "id": "task-19",
+      "number": 19,
+      "title": "Data Hub — Orders tab",
+      "phase": "frontend",
+      "status": "completed",
+      "dependencies": ["task-16", "task-07"],
+      "description": "Orders table with channel/status filters.",
+      "files": [
+        "apps/web/src/app/data/orders/page.tsx",
+        "apps/web/src/components/data/order-table.tsx"
+      ],
+      "acceptanceCriteria": [
+        "All PRD columns",
+        "Filter by channel and status",
+        "Search by customer name"
+      ],
+      "subtasks": [
+        "Order table component",
+        "Filter controls",
+        "Customer name search"
+      ]
+    },
+    {
+      "id": "task-20",
+      "number": 20,
+      "title": "Dashboard",
+      "phase": "frontend",
+      "status": "completed",
+      "dependencies": ["task-16", "task-07", "task-12"],
+      "description": "Stats row, AI insight banner, recent campaigns, donut chart.",
+      "files": [
+        "apps/web/src/app/page.tsx",
+        "apps/web/src/components/dashboard/stats-row.tsx",
+        "apps/web/src/components/dashboard/insight-banner.tsx",
+        "apps/web/src/components/dashboard/recent-campaigns.tsx",
+        "apps/web/src/components/dashboard/customer-health-chart.tsx"
+      ],
+      "acceptanceCriteria": [
+        "4 stat cards",
+        "AI insight banner with Start Campaign CTA",
+        "Last 3-5 campaign cards",
+        "Customer health donut chart",
+        "Loads under 2 seconds"
+      ],
+      "subtasks": [
+        "Stats row component",
+        "Insight banner with CTA → console",
+        "Recent campaigns cards",
+        "Recharts donut for tag breakdown"
+      ]
+    },
+    {
+      "id": "task-21",
+      "number": 21,
+      "title": "Campaign Tracker — list view",
+      "phase": "frontend",
+      "status": "completed",
+      "dependencies": ["task-16", "task-08"],
+      "description": "Campaign table with metrics, filter, sort.",
+      "files": [
+        "apps/web/src/app/campaigns/page.tsx",
+        "apps/web/src/components/campaigns/campaign-table.tsx"
+      ],
+      "acceptanceCriteria": [
+        "All PRD metric columns",
+        "Filter by status and channel",
+        "Sort by date or performance"
+      ],
+      "subtasks": [
+        "Campaign table",
+        "Filter/sort controls",
+        "Status and channel badges"
+      ]
+    },
+    {
+      "id": "task-22",
+      "number": 22,
+      "title": "Campaign Tracker — detail view",
+      "phase": "frontend",
+      "status": "completed",
+      "dependencies": ["task-21", "task-28"],
+      "description": "Campaign detail with stats, AI summary, recipient table, re-run.",
+      "files": [
+        "apps/web/src/app/campaigns/[id]/page.tsx",
+        "apps/web/src/components/campaigns/campaign-detail.tsx",
+        "apps/web/src/components/campaigns/recipient-table.tsx"
+      ],
+      "acceptanceCriteria": [
+        "Aggregate stat cards",
+        "AI summary card",
+        "Per-recipient table",
+        "Re-run opens new chat with injected context"
+      ],
+      "subtasks": [
+        "Campaign header",
+        "Aggregate stats",
+        "AI summary display",
+        "Recipient table",
+        "Re-run button → /campaigns/new with context"
+      ]
+    },
+    {
+      "id": "task-23",
+      "number": 23,
+      "title": "AI tool definitions (shared)",
+      "phase": "ai-layer",
+      "status": "completed",
+      "dependencies": ["task-03", "task-08"],
+      "description": "Zod schemas and implementations for all 6 AI tools.",
+      "files": [
+        "packages/shared/src/ai/tools.ts",
+        "apps/crm-api/src/ai/tools/index.ts",
+        "apps/crm-api/src/ai/tools/get-customer-segment.ts",
+        "apps/crm-api/src/ai/tools/get-campaign-stats.ts",
+        "apps/crm-api/src/ai/tools/get-customer-profile.ts",
+        "apps/crm-api/src/ai/tools/get-churn-risk.ts",
+        "apps/crm-api/src/ai/tools/get-top-spenders.ts",
+        "apps/crm-api/src/ai/tools/fire-campaign.ts"
+      ],
+      "acceptanceCriteria": [
+        "All 6 PRD tools defined with Zod schemas",
+        "Tools call segment/campaign/customer services",
+        "fireCampaign blocked without confirmation flag"
+      ],
+      "subtasks": [
+        "Shared tool schema definitions",
+        "Implement each tool handler",
+        "Wire to existing services",
+        "Export tool registry for AI SDK"
+      ]
+    },
+    {
+      "id": "task-24",
+      "number": 24,
+      "title": "AI chat backend (streaming + tool loop)",
+      "phase": "ai-layer",
+      "status": "completed",
+      "dependencies": ["task-23", "task-06"],
+      "description": "POST /api/ai/chat with Gemini 2.0 Flash via Vercel AI SDK.",
+      "files": [
+        "apps/crm-api/src/routes/ai-chat.ts",
+        "apps/crm-api/src/ai/chat-handler.ts",
+        "apps/crm-api/src/ai/system-prompt.ts",
+        "apps/crm-api/src/ai/gemini.ts"
+      ],
+      "acceptanceCriteria": [
+        "Streaming SSE responses",
+        "Multi-step tool calling",
+        "Messages persisted to AIConversation",
+        "System prompt with Thread & Co. brand + confirmation rules",
+        "Stream starts within 3 seconds"
+      ],
+      "subtasks": [
+        "Gemini provider setup with Vercel AI SDK",
+        "Chat route with streamText",
+        "Conversation persistence",
+        "System prompt with brand context",
+        "Tool loop configuration"
+      ]
+    },
+    {
+      "id": "task-25",
+      "number": 25,
+      "title": "Confirmation gate logic",
+      "phase": "ai-layer",
+      "status": "completed",
+      "dependencies": ["task-24"],
+      "description": "Intent classification + server-side confirmation state machine.",
+      "files": [
+        "apps/crm-api/src/ai/confirmation.ts",
+        "apps/crm-api/src/ai/conversation-state.ts"
+      ],
+      "acceptanceCriteria": [
+        "Intent classification detects approval",
+        "fireCampaign blocked unless confirmation flag set",
+        "AI asks explicit confirm question before firing",
+        "Draft campaign persisted before confirmation"
+      ],
+      "subtasks": [
+        "Conversation state tracker per session",
+        "Intent classifier for approval phrases",
+        "Gate fireCampaign tool execution",
+        "Draft persistence on segment/message ready"
+      ]
+    },
+    {
+      "id": "task-26",
+      "number": 26,
+      "title": "AI Campaign Console — chat UI",
+      "phase": "ai-layer",
+      "status": "completed",
+      "dependencies": ["task-24", "task-16"],
+      "description": "Split layout chat with streaming, segment preview, proactive messages.",
+      "files": [
+        "apps/web/src/app/campaigns/new/page.tsx",
+        "apps/web/src/components/ai/chat-panel.tsx",
+        "apps/web/src/components/ai/message-list.tsx",
+        "apps/web/src/components/ai/segment-preview.tsx",
+        "apps/web/src/components/ai/chat-input.tsx"
+      ],
+      "acceptanceCriteria": [
+        "60/40 split layout",
+        "Streaming token display",
+        "Inline segment mini-table",
+        "Proactive message on load",
+        "Inactivity insight every ~3 min"
+      ],
+      "subtasks": [
+        "Split layout page",
+        "Message list with streaming",
+        "Segment preview component",
+        "Chat input with send",
+        "Inactivity timer for proactive insight"
+      ]
+    },
+    {
+      "id": "task-27",
+      "number": 27,
+      "title": "Live metrics panel",
+      "phase": "ai-layer",
+      "status": "completed",
+      "dependencies": ["task-11", "task-26"],
+      "description": "Real-time campaign metrics via Socket.io.",
+      "files": [
+        "apps/web/src/components/ai/live-metrics-panel.tsx",
+        "apps/web/src/components/ai/progress-bar.tsx",
+        "apps/web/src/components/ai/event-feed.tsx"
+      ],
+      "acceptanceCriteria": [
+        "Default: last campaign or empty state",
+        "Active: progress bar, stat cards, event feed",
+        "SENDING → COMPLETED transition",
+        "Updates within 500ms via WebSocket"
+      ],
+      "subtasks": [
+        "Metrics panel layout",
+        "Stat cards with counts and percentages",
+        "Progress bar",
+        "Live event feed (last 5)",
+        "Socket.io subscription wiring"
+      ]
+    },
+    {
+      "id": "task-28",
+      "number": 28,
+      "title": "Post-campaign AI summary generation",
+      "phase": "ai-layer",
+      "status": "completed",
+      "dependencies": ["task-10", "task-24"],
+      "description": "Async Gemini job on campaign completion.",
+      "files": [
+        "apps/crm-api/src/ai/post-campaign-summary.ts"
+      ],
+      "acceptanceCriteria": [
+        "Triggered on campaign COMPLETED",
+        "Saves natural language summary to Campaign.aiSummary",
+        "Displayed on campaign detail page"
+      ],
+      "subtasks": [
+        "Summary generation prompt with stats",
+        "Async job on completion",
+        "Save to aiSummary field"
+      ]
+    },
+    {
+      "id": "task-29",
+      "number": 29,
+      "title": "AI performance Q&A & proactive recommendations",
+      "phase": "ai-layer",
+      "status": "completed",
+      "dependencies": ["task-24", "task-26"],
+      "description": "Campaign stats Q&A, dashboard CTA context injection, re-run context.",
+      "files": [
+        "apps/crm-api/src/ai/context-injection.ts"
+      ],
+      "acceptanceCriteria": [
+        "Handles 'how did last week's campaign do?'",
+        "Dashboard CTA pre-fills chat context",
+        "Re-run injects segment + message as system context in new thread"
+      ],
+      "subtasks": [
+        "getCampaignStats tool handles performance queries",
+        "Context injection from URL/sessionStorage",
+        "Re-run context builder for new conversation"
+      ]
+    },
+    {
+      "id": "task-30",
+      "number": 30,
+      "title": "Error handling & edge cases",
+      "phase": "polish",
+      "status": "completed",
+      "dependencies": ["task-26", "task-27"],
+      "description": "Graceful errors across AI, stub, CSV, and UI states.",
+      "files": [],
+      "acceptanceCriteria": [
+        "AI parse failure message",
+        "Stub unreachable error in chat",
+        "CSV row-level errors",
+        "Loading/empty/error states on all screens"
+      ],
+      "subtasks": [
+        "AI fallback messages",
+        "Stub failure handling in chat",
+        "CSV error display",
+        "Empty and loading states audit"
+      ]
+    },
+    {
+      "id": "task-31",
+      "number": 31,
+      "title": "Environment & deployment",
+      "phase": "polish",
+      "status": "completed",
+      "dependencies": ["task-30"],
+      "description": "Production deploy configs for Vercel + Railway.",
+      "files": [
+        ".env.example",
+        "apps/web/vercel.json",
+        "apps/crm-api/railway.toml",
+        "apps/channel-stub/railway.toml"
+      ],
+      "acceptanceCriteria": [
+        "Complete .env.example for all apps",
+        "Vercel deploy config",
+        "Railway configs for both APIs",
+        "CORS + WebSocket origins for production"
+      ],
+      "subtasks": [
+        "Document all env vars",
+        "Vercel config with API URLs",
+        "Railway service configs",
+        "Production CORS/WS setup"
+      ]
+    },
+    {
+      "id": "task-32",
+      "number": 32,
+      "title": "README & documentation",
+      "phase": "polish",
+      "status": "completed",
+      "dependencies": ["task-31"],
+      "description": "Full README with architecture, setup, tradeoffs.",
+      "files": ["README.md"],
+      "acceptanceCriteria": [
+        "Product overview",
+        "ASCII architecture diagram",
+        "Local + deployed setup",
+        "Env var table",
+        "Tradeoffs section"
+      ],
+      "subtasks": [
+        "Write README sections",
+        "Architecture diagram",
+        "Setup instructions",
+        "Tradeoffs documentation"
+      ]
+    },
+    {
+      "id": "task-33",
+      "number": 33,
+      "title": "End-to-end smoke test & demo hardening",
+      "phase": "polish",
+      "status": "completed",
+      "dependencies": ["task-32"],
+      "description": "Full demo path verification and performance tuning.",
+      "files": ["docs/demo-script.md"],
+      "acceptanceCriteria": [
+        "Dashboard → chat → segment → confirm → live metrics → detail → summary works",
+        "Dashboard < 2s, stream < 3s, WS < 500ms",
+        "Seed supports 'last week's campaign' query"
+      ],
+      "subtasks": [
+        "Write demo script",
+        "Run full E2E path",
+        "Fix latency issues",
+        "Verify evaluator demo queries"
+      ]
+    }
+  ],
+  "routes": {
+    "dashboard": "/",
+    "customers": "/data/customers",
+    "customerDetail": "/data/customers/[id]",
+    "orders": "/data/orders",
+    "aiConsole": "/campaigns/new",
+    "campaigns": "/campaigns",
+    "campaignDetail": "/campaigns/[id]"
+  },
+  "envVars": {
+    "shared": ["NODE_ENV"],
+    "web": ["NEXT_PUBLIC_CRM_API_URL", "NEXT_PUBLIC_WS_URL"],
+    "crmApi": [
+      "DATABASE_URL",
+      "GEMINI_API_KEY",
+      "CHANNEL_STUB_URL",
+      "STUB_SECRET",
+      "PORT",
+      "CORS_ORIGIN",
+      "SEED_ONLY"
+    ],
+    "channelStub": [
+      "CRM_CALLBACK_URL",
+      "STUB_SECRET",
+      "PORT"
+    ]
+  },
+  "currentTask": null,
+  "projectStatus": "completed",
+  "parallelAgents": {
+    "builder": "implements current task",
+    "reviewer": "reviews previous completed task; fixes only if review fails"
+  },
+  "reviewPolicy": "Alternate agent reviews each completed task before proceeding to next"
+}

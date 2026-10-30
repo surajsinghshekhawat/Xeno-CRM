@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CustomerTag {
+  NEW
+  REGULAR
+  VIP
+  LAPSED
+  AT_RISK
+}
+
+enum OrderChannel {
+  ONLINE
+  IN_STORE
+  APP
+}
+
+enum OrderStatus {
+  COMPLETED
+  RETURNED
+  PENDING
+}
+
+enum CampaignChannel {
+  WHATSAPP
+  SMS
+  EMAIL
+  RCS
+}
+
+enum CampaignStatus {
+  DRAFT
+  SENDING
+  ACTIVE
+  COMPLETED
+  FAILED
+}
+
+enum RecipientStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  OPENED
+  CLICKED
+  CONVERTED
+}
+
+model Customer {
+  id             String      @id @default(uuid()) @db.Uuid
+  name           String
+  email          String      @unique
+  phone          String?
+  totalSpend     Float       @default(0)
+  orderCount     Int         @default(0)
+  lastPurchaseAt DateTime?
+  tag            CustomerTag @default(NEW)
+  city           String?
+  ageGroup       String?
+  gender         String?
+  createdAt      DateTime    @default(now())
+
+  orders             Order[]
+  campaignRecipients CampaignRecipient[]
+
+  @@index([tag])
+  @@index([lastPurchaseAt])
+  @@index([totalSpend])
+}
+
+model Order {
+  id         String       @id @default(uuid()) @db.Uuid
+  customerId String       @db.Uuid
+  items      Json
+  totalValue Float
+  channel    OrderChannel
+  status     OrderStatus  @default(COMPLETED)
+  createdAt  DateTime     @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([createdAt])
+  @@index([channel])
+  @@index([status])
+}
+
+model Campaign {
+  id                String          @id @default(uuid()) @db.Uuid
+  name              String
+  goal              String
+  segmentDefinition Json
+  segmentSize       Int
+  messageTemplate   String          @db.Text
+  channel           CampaignChannel
+  status            CampaignStatus  @default(DRAFT)
+  aiSummary         String?         @db.Text
+  createdAt         DateTime        @default(now())
+  completedAt       DateTime?
+
+  recipients    CampaignRecipient[]
+  conversations AIConversation[]
+
+  @@index([status])
+  @@index([channel])
+  @@index([createdAt])
+}
+
+model CampaignRecipient {
+  id              String          @id @default(uuid()) @db.Uuid
+  campaignId      String          @db.Uuid
+  customerId      String          @db.Uuid
+  personalizedMsg String          @db.Text
+  status          RecipientStatus @default(QUEUED)
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  openedAt        DateTime?
+  clickedAt       DateTime?
+  convertedAt     DateTime?
+  failureReason   String?
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, customerId])
+  @@index([campaignId])
+  @@index([status])
+  @@index([customerId])
+}
+
+model AIConversation {
+  id         String   @id @default(uuid()) @db.Uuid
+  messages   Json     @default("[]")
+  campaignId String?  @db.Uuid
+  createdAt  DateTime @default(now())
+
+  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([campaignId])
+  @@index([createdAt])
+}

@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: xenocrm-postgres
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: xeno
+      POSTGRES_PASSWORD: xeno
+      POSTGRES_DB: xenocrm
+    volumes:
+      - xenocrm_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xeno -d xenocrm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  xenocrm_pgdata:
